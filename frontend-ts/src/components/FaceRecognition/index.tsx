@@ -1,6 +1,10 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import * as faceApi from 'face-api.js'
-import { Container, Typography, Box } from '@mui/material'
+import { Container, Typography, Box, Divider } from '@mui/material'
+import { ConstructionOutlined } from '@mui/icons-material'
+import { getRestaurantRecommendations } from '../../utils/getRecommendations'
+import { Restaurant } from '../../utils/RestaurantInterface'
+import RestaurantCard from '../RestaurantCard'
 
 const expressionMap = {
     neutral: '😶',
@@ -14,7 +18,11 @@ const expressionMap = {
 
 let mediaStream: MediaStream | null = null
 
+let isCuisuineLoading = false
+
 export const FaceRecognition: React.FunctionComponent = () => {
+    const [restaurants, setRestaurants] = useState<Restaurant[]>([])
+    const [isRestaurantsLoading, setRestaurantsLoading] = useState(false)
     // Analyze the mood now
     const videoRef = useRef<null | HTMLVideoElement>(null)
 
@@ -48,7 +56,7 @@ export const FaceRecognition: React.FunctionComponent = () => {
             .withFaceExpressions()
 
         if (result) {
-            console.log(result)
+            // console.log(result)
             const expressions = result.expressions
                 .asSortedArray()
                 .reduce((acc, { expression, probability }) => {
@@ -62,7 +70,20 @@ export const FaceRecognition: React.FunctionComponent = () => {
                 ...prevState,
                 expressions,
             }))
-            console.log(expressions)
+            // console.log(expressions)
+            // Get the recommendations for the expressions
+
+            if (expressions.length === 0) return
+            if (isCuisuineLoading) return
+
+            const currentEmotion = expressions[0][0] as string
+            isCuisuineLoading = true
+
+            const restaurantRecommendations =
+                await getRestaurantRecommendations(currentEmotion)
+
+            isCuisuineLoading = false
+            setRestaurants(restaurantRecommendations)
         }
 
         setTimeout(() => detectFaces(), 1000)
@@ -118,6 +139,46 @@ export const FaceRecognition: React.FunctionComponent = () => {
                         })}
                 </Box>
             </Box>
+
+            {/* Restaurant Displays --------- */}
+            <Box my={2}>
+                <Divider />
+            </Box>
+
+            <Typography variant="h4" my={2}>
+                Restaurants Avaialble for you!!
+            </Typography>
+            {restaurants.length > 0 ? (
+                <Box display="flex" flexDirection="row" flexWrap="wrap">
+                    {restaurants.map((restaurant) => {
+                        return (
+                            <Box
+                                key={`${restaurant.id}-${restaurant.name}`}
+                                maxWidth={360}
+                                minWidth={360}
+                                maxHeight={420}
+                                minHeight={420}
+                                mx={1}
+                                mb={2}
+                            >
+                                <RestaurantCard restaurant={restaurant} />
+                            </Box>
+                        )
+                    })}
+                </Box>
+            ) : (
+                <Box
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    flexDirection="column"
+                >
+                    <Typography variant="h5">
+                        No Restauants available currently!! Please check back
+                        later
+                    </Typography>
+                </Box>
+            )}
         </Container>
     )
 }
